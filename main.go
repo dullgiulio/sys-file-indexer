@@ -17,10 +17,7 @@ func main() {
 	sink := make(chan file)
 
 	// Number of processor workers to process the files
-	nproc := runtime.NumCPU() - 1
-	if nproc < 1 {
-		nproc = 1
-	}
+	nproc := runtime.NumCPU()
 	// Start all processors
 	proc := newProcessor(sink, nproc)
 	proc.run()

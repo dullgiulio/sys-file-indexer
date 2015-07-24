@@ -59,6 +59,7 @@ func (i *indexer) readdir(name string) {
 		log.Print(err)
 		return
 	}
+	defer dir.Close()
 	for {
 		fi, err := dir.Readdir(255)
 		if err != nil {

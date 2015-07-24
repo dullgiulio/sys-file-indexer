@@ -109,6 +109,7 @@ func makeProps(h hash.Hash, f file) props {
 		log.Print(name, ": Open: ", err)
 		return p
 	}
+	defer r.Close()
 	p.ident = filehash(name, h, r)
 	// Non-images are completely processed.
 	if !strings.HasPrefix(p.mime, "image/") {
