@@ -31,7 +31,7 @@ func newIndexer() *indexer {
 	return &indexer{
 		// Buffering the in channel, directories won't be scanned immediately when found
 		// but (probably) after some files have been read.
-		in:  make(chan string, 20),
+		in:  make(chan string, 50),
 		out: make(chan file),
 	}
 }
@@ -72,13 +72,14 @@ func (i *indexer) readdir(name string) {
 			f := makeFile(fi[j], name)
 			if f.IsDir() {
 				i.addDir(f.name())
+				// TODO: It should index directories too, but they are not supported by the processor.
 			}
 			i.out <- f
 		}
 	}
 }
 
-func (i *indexer) scan(root string, sink chan<- file) {
+func (i *indexer) scan(sink chan<- file, root string) {
 	i.addDir(root)
 	go i.run()
 	for f := range i.out {

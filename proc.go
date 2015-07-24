@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"fmt"
 	"hash"
@@ -11,6 +12,7 @@ import (
 	"io"
 	"log"
 	"mime"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,17 +21,19 @@ import (
 )
 
 type processor struct {
-	nproc int
-	in    <-chan file
-	hash  chan hash.Hash
-	wg    sync.WaitGroup
+	nproc  int
+	in     <-chan file
+	hash   chan hash.Hash
+	wg     sync.WaitGroup
+	writer *writer
 }
 
-func newProcessor(in <-chan file, n int) *processor {
+func newProcessor(in <-chan file, w *writer, n int) *processor {
 	p := &processor{
-		nproc: n,
-		in:    in,
-		hash:  make(chan hash.Hash, n),
+		nproc:  n,
+		in:     in,
+		hash:   make(chan hash.Hash, n),
+		writer: w,
 	}
 	for i := 0; i < n; i++ {
 		p.hash <- sha1.New()
@@ -41,14 +45,7 @@ func (p *processor) runOne() {
 	defer p.wg.Done()
 	for f := range p.in {
 		h := <-p.hash
-		props := makeProps(h, f)
-
-		// XXX: debug
-		log.Print(props.String())
-
-		// TODO:XXX: Send to DB writer
-
-		h.Reset()
+		p.writer.write(makeProps(h, f))
 		p.hash <- h
 	}
 }
@@ -62,11 +59,23 @@ func (p *processor) run() {
 
 func (p *processor) wait() {
 	p.wg.Wait()
+	p.writer.close()
+	p.writer.wait()
 }
 
 type sha1hash []byte
 
+func strhash(data string, h hash.Hash) sha1hash {
+	defer h.Reset()
+	if _, err := io.WriteString(h, data); err != nil {
+		log.Print("String write to SHA1: ", err)
+		return nil
+	}
+	return h.Sum(nil)
+}
+
 func filehash(name string, h hash.Hash, r io.Reader) sha1hash {
+	defer h.Reset()
 	if _, err := io.Copy(h, r); err != nil {
 		log.Print(name, ": Copy to SHA1: ", err)
 		return nil
@@ -74,44 +83,114 @@ func filehash(name string, h hash.Hash, r io.Reader) sha1hash {
 	return h.Sum(nil)
 }
 
+func sniffMIME(name string, r *os.File) string {
+	if _, err := r.Seek(0, 0); err != nil {
+		log.Print(name, ": Seek: ", err)
+		return ""
+	}
+	buf := make([]byte, 255)
+	n, err := r.Read(buf)
+	if n == 0 && err != nil {
+		log.Print(name, ": Read: ", err)
+		return ""
+	}
+	mimetype := http.DetectContentType(buf)
+	n = strings.Index(mimetype, "; ")
+	if n >= 0 {
+		mimetype = mimetype[:n]
+	}
+	return mimetype
+}
+
 // Metadata to save about a file
 type props struct {
-	// SHA1 hash of file contents
+	// SHA1 hash of file path + name
 	ident sha1hash
-	// SHA1 hash of directory (XXX: how exactly?)
+	// SHA1 hash of directory
 	dident sha1hash
+	// SHA1 hash of file contents
+	chash sha1hash
 	// Full filename
-	name string
+	fname string
+	// Basename
+	bname string
 	// Extension
 	ext string
+	// Directory name
+	dir string
 	// MIME type
 	mime string
 	// If image, width x height
 	isize image.Point
 	// File size in bytes
 	size int64
+	// Type of file
+	ftype int
 	// Modification time
 	modtime time.Time
+	// Creation time (of this structure)
+	ctime time.Time
+}
+
+func stripRoot(s string) string {
+	n := strings.Index(s, "/")
+	if n >= 0 {
+		return s[n:]
+	}
+	return s
+}
+
+func mapType(mime string) int {
+	n := strings.Index(mime, "/")
+	if n >= 0 {
+		mime = mime[:n-1]
+	}
+	switch mime {
+	case "text":
+		return 1
+	case "image":
+		return 2
+	case "audio":
+		return 3
+	case "video":
+		return 4
+	case "application":
+		return 5
+	}
+	return 0 // unknown
 }
 
 func makeProps(h hash.Hash, f file) props {
 	name := f.name()
-	ext := filepath.Ext(name)
+	fname := stripRoot(name)
+	ext := filepath.Ext(fname)
+	dir := filepath.Dir(fname)
 	p := props{
 		size:    f.Size(),
 		modtime: f.ModTime(),
-		name:    name,
+		bname:   filepath.Base(fname),
+		fname:   fname,
 		ext:     ext,
+		dir:     dir,
 		mime:    mime.TypeByExtension(ext),
+		ctime:   time.Now(),
 	}
 	r, err := os.Open(name)
 	if err != nil {
-		log.Print(name, ": Open: ", err)
+		log.Print(name, ": Props: ", err)
 		return p
 	}
 	defer r.Close()
-	p.ident = filehash(name, h, r)
-	// Non-images are completely processed.
+	p.ftype = mapType(p.mime)
+	p.chash = filehash(name, h, r)
+	p.ident = strhash(fname, h)
+	p.dident = strhash(dir, h)
+	// If the extension is empty, we need to detect
+	// the MIME type via file contents
+	if p.mime == "" {
+		p.mime = sniffMIME(name, r)
+	}
+	// Non-images are completely processed at this point
 	if !strings.HasPrefix(p.mime, "image/") {
 		return p
 	}
@@ -122,16 +201,29 @@ func makeProps(h hash.Hash, f file) props {
 	}
 	imgconf, _, err := image.DecodeConfig(r)
 	if err != nil {
-		log.Print(name, ": Decoder: ", err)
+		log.Print(name, ": Image decoder: ", err)
 		return p
 	}
 	p.isize = image.Point{imgconf.Width, imgconf.Height}
 	return p
 }
 
-func (p props) String() string {
-	if strings.HasPrefix(p.mime, "image/") {
-		return fmt.Sprintf("%x %dx%d %s", p.ident, p.isize.X, p.isize.Y, p.name)
-	}
-	return fmt.Sprintf("%x %s", p.ident, p.name)
+func escape(s string) string {
+	return strings.Replace(s, `"`, `\"`, -1)
+}
+
+// Make sure we have a buffer, we don't want write errors here.
+func (p *props) writeBuf(uid uint, w *bytes.Buffer) {
+	fmt.Fprintf(w, `file:"%d","0","%d","0","0","1","%d","0","`, uid, p.ctime.Unix(), p.ftype)
+	w.WriteString(escape(p.fname))
+	fmt.Fprintf(w, `","%x","%x",`, p.ident, p.dident)
+	fmt.Fprintf(w, `"%s","%s","`, p.ext, p.mime)
+	w.WriteString(escape(p.bname))
+	fmt.Fprintf(w, `","%x",`, escape(p.bname))
+	fmt.Fprintf(w, "\"%d\",\"%d\",\"%d\"\n", p.size, p.ctime.Unix(), p.modtime.Unix())
+	// Write metadata
+	fmt.Fprintf(w, `meta:"%d","0","%d","%d","0","0","0","",`, uid, p.modtime.Unix(), p.ctime.Unix())
+	w.WriteString(`"0","0","0","","0","0","0","0","0","0",`)
+	fmt.Fprintf(w, `"%d","","%d","%d",`, uid, p.isize.X, p.isize.Y)
+	io.WriteString(w, "\"\",\"\",\"0\"\n")
 }

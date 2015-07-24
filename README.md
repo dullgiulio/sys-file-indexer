@@ -4,5 +4,7 @@ A custom build file concurrent file indexer and hasher.
 
 # TODO
 
-* Database persistance
-* Apply filepath.FromSlashes somewhere
+* Can scan multiple directories
+* Can scan single files (from args)
+* Some CLI options
+* Windows: Apply filepath.FromSlashes somewhere
