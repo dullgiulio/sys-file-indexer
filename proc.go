@@ -120,12 +120,12 @@ func makeProps(h hash.Hash, f file) props {
 		log.Print(name, ": Seek: ", err)
 		return p
 	}
-	img, _, err := image.Decode(r)
+	imgconf, _, err := image.DecodeConfig(r)
 	if err != nil {
 		log.Print(name, ": Decoder: ", err)
 		return p
 	}
-	p.isize = img.Bounds().Size()
+	p.isize = image.Point{imgconf.Width, imgconf.Height}
 	return p
 }
 
