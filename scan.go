@@ -72,23 +72,18 @@ func (i *indexer) readdir(name string) {
 			f := makeFile(fi[j], name)
 			if f.IsDir() {
 				i.addDir(f.name())
-				// TODO: It should index directories too, but they are not supported by the processor.
+				continue
 			}
 			i.out <- f
 		}
 	}
 }
 
-func (i *indexer) scan(sink chan<- file, root string) {
+func (i *indexer) sink() <-chan file {
+	return i.out
+}
+
+func (i *indexer) scan(root string) {
 	i.addDir(root)
 	go i.run()
-	for f := range i.out {
-		if f.IsDir() {
-			// TODO: It should also sink dirs, but they are
-			// 		 not supported by the workers at the moment.
-			continue
-		}
-		sink <- f
-	}
-	close(sink)
 }
