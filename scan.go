@@ -74,7 +74,13 @@ func (i *indexer) readdir(name string) {
 				i.addDir(f.name())
 				continue
 			}
-			i.out <- f
+			// TODO: Handling of symlinks outside the root!
+			if f.Mode()&os.ModeSymlink != 0 {
+				log.Printf("Error: %s skipped. Symlinks are currently not supported!", name)
+			}
+			if f.Mode().IsRegular() {
+				i.out <- f
+			}
 		}
 	}
 }
