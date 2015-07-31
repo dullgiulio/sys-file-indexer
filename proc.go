@@ -214,13 +214,22 @@ func escape(s string) string {
 
 // Make sure we have a buffer, we don't want write errors here.
 func (p *props) writeBuf(uid uint, w *bytes.Buffer) {
+	// Single mode writes a single condensed line.  Used for debugging comparison with tester/tester.
+	if *singleMode {
+		fmt.Fprintf(w, `"0","0","1","%d","0","%s",`, p.ftype, escape(p.fname))
+		fmt.Fprintf(w, `"%x","%x",`, p.ident, p.dident)
+		fmt.Fprintf(w, `"%s","%s","%s",`, p.ext, p.mime, escape(p.bname))
+		fmt.Fprintf(w, `"%x",`, p.chash)
+		fmt.Fprintf(w, "\"%d\",\"%d\",\"%d\"\n", p.size, p.isize.X, p.isize.Y)
+		return
+	}
 	fmt.Fprintf(w, `file:"%d","0","%d","0","0","1","%d","0","`, uid, p.ctime.Unix(), p.ftype)
 	w.WriteString(escape(p.fname))
 	fmt.Fprintf(w, `","%x","%x",`, p.ident, p.dident)
 	fmt.Fprintf(w, `"%s","%s","`, p.ext, p.mime)
 	w.WriteString(escape(p.bname))
-	fmt.Fprintf(w, `","%x",`, escape(p.bname))
-	fmt.Fprintf(w, "\"%d\",\"%d\",\"%d\"\n", p.size, p.ctime.Unix(), p.modtime.Unix())
+	fmt.Fprintf(w, `","%x","%d",`, p.chash, p.size)
+	fmt.Fprintf(w, "\"%d\",\"%d\"\n", p.ctime.Unix(), p.modtime.Unix())
 	// Write metadata
 	fmt.Fprintf(w, `meta:"%d","0","%d","%d","0","0","0","",`, uid, p.modtime.Unix(), p.ctime.Unix())
 	w.WriteString(`"0","0","0","","0","0","0","0","0","0",`)

@@ -12,6 +12,8 @@ func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
+var singleMode = flag.Bool("single", false, "Output in single view mode")
+
 func main() {
 	flag.Parse()
 	root := filepath.Clean(filepath.ToSlash(flag.Arg(0)))
