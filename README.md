@@ -1,8 +1,8 @@
-## File Indexer
+# File Indexer
 
 A custom build file concurrent file indexer and hasher.
 
-# TODO
+### TODO
 
 * Can scan multiple directories
 * Can scan single files (from args)
