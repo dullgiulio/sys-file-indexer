@@ -22,12 +22,13 @@ func main() {
 	writer := newWriter(os.Stdout)
 	go writer.run()
 
-	// Start scanning the directory
-	idx := newIndexer()
-	idx.scan(root)
-
 	// Number of processor workers to process the files
 	nproc := runtime.NumCPU()
+
+	// Start scanning the directory
+	idx := newIndexer()
+	go idx.scan(root, nproc)
+
 	// Start all processors
 	proc := newProcessor(idx.sink(), writer, nproc)
 	proc.run()
