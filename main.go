@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 )
 
 func init() {
@@ -13,9 +15,20 @@ func init() {
 }
 
 var singleMode = flag.Bool("single", false, "Output in single view mode")
+var profile = flag.String("profile", "pprof.out", "Write profiling information to this file")
 
 func main() {
 	flag.Parse()
+
+	if *profile != "" {
+		f, err := os.Create(*profile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	root := filepath.Clean(filepath.ToSlash(flag.Arg(0)))
 
 	// TODO: From options or default.
