@@ -20,6 +20,14 @@ import (
 	"time"
 )
 
+const queryFile = `INSERT INTO sys_file (uid, pid, tstamp, last_indexed, missing, storage, type, metadata,
+	identifier, identifier_hash, folder_hash, extension, mime_type, name, sha1, size, creation_date, modification_date) VALUES
+("%d","0","%d","0","0","1","%d","0","%s","%x","%x","%s","%s","%s","%x","%d","%d","%d");
+`
+const queryMeta = `INSERT INTO sys_file_metadata (tstamp, crdate, file, width, height) VALUES
+("%d","%d","%d","%d","%d");
+`
+
 type processor struct {
 	nproc  int
 	in     <-chan file
@@ -223,6 +231,13 @@ func (p *props) writeBuf(uid uint, w *bytes.Buffer) {
 		fmt.Fprintf(w, "\"%d\",\"%d\",\"%d\"\n", p.size, p.isize.X, p.isize.Y)
 		return
 	}
+	if *sqlMode {
+		fmt.Fprintf(w, queryFile, uid, p.ctime.Unix(), p.ftype, escape(p.fname),
+			p.ident, p.dident, p.ext, p.mime, escape(p.bname), p.chash, p.size,
+			p.ctime.Unix(), p.modtime.Unix())
+		fmt.Fprintf(w, queryMeta, p.modtime.Unix(), p.ctime.Unix(), uid, p.isize.X, p.isize.Y)
+		return
+	}
 	fmt.Fprintf(w, `file:"%d","0","%d","0","0","1","%d","0","`, uid, p.ctime.Unix(), p.ftype)
 	w.WriteString(escape(p.fname))
 	fmt.Fprintf(w, `","%x","%x",`, p.ident, p.dident)
@@ -231,7 +246,7 @@ func (p *props) writeBuf(uid uint, w *bytes.Buffer) {
 	fmt.Fprintf(w, `","%x","%d",`, p.chash, p.size)
 	fmt.Fprintf(w, "\"%d\",\"%d\"\n", p.ctime.Unix(), p.modtime.Unix())
 	// Write metadata
-	fmt.Fprintf(w, `meta:"%d","0","%d","%d","0","0","0","",`, uid, p.modtime.Unix(), p.ctime.Unix())
+	fmt.Fprintf(w, `meta:"0","%d","%d","0","0","0","",`, p.modtime.Unix(), p.ctime.Unix())
 	w.WriteString(`"0","0","0","","0","0","0","0","0","0",`)
 	fmt.Fprintf(w, `"%d","","%d","%d",`, uid, p.isize.X, p.isize.Y)
 	io.WriteString(w, "\"\",\"\",\"0\"\n")
