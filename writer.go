@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -11,20 +10,21 @@ import (
 
 type writer struct {
 	w    io.Writer
-	ch   chan props
+	ch   chan string
 	done chan struct{}
 }
 
 func newWriter(w io.Writer) *writer {
 	return &writer{
-		w:    w,
-		ch:   make(chan props),
+		w: w,
+		// TODO: It's a good idea to buffer this, esp. in SQL mode.
+		ch:   make(chan string),
 		done: make(chan struct{}),
 	}
 }
 
-func (w *writer) write(p props) {
-	w.ch <- p
+func (w *writer) write(s string) {
+	w.ch <- s
 }
 
 func (w *writer) close() {
@@ -32,18 +32,18 @@ func (w *writer) close() {
 }
 
 func (w *writer) run() {
-	var (
-		uid uint
-		buf bytes.Buffer
-	)
-	for p := range w.ch {
+	var uid int64
+	for s := range w.ch {
 		uid++
-		p.writeBuf(uid, &buf)
-		if _, err := io.Copy(w.w, &buf); err != nil {
+		// In SQL mode we need UID to be set; see comment below on how
+		// this is operation is safe.
+		if *sqlMode {
+			s = strings.Replace(s, "UID", fmt.Sprintf("%d", uid), 1)
+		}
+		if _, err := io.WriteString(w.w, s); err != nil {
 			log.Print("Write to result: ", err)
 			break
 		}
-		buf.Reset()
 	}
 	w.done <- struct{}{}
 }
@@ -63,8 +63,12 @@ func (s splitWriter) write(w io.Writer) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, s.prefix) {
+			// Replacing the first occurrence of UID is safe here because file
+			// contains it as first field, meta as last but has only numeric fields.
 			line = strings.Replace(line, "UID", fmt.Sprintf("%d", uid), 1)
-			fmt.Fprintln(w, line[len(s.prefix):])
+			if _, err := fmt.Fprintln(w, line[len(s.prefix):]); err != nil {
+				return err
+			}
 			uid++
 		}
 	}

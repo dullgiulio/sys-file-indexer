@@ -19,6 +19,7 @@ var (
 	sqlMode    = flag.Bool("sql", false, "Output in SQL mode")
 	fileMode   = flag.String("ofile", "", "Output the CSV for sys_file reading reading from `F`")
 	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
+	deltaMode  = flag.String("delta", "", "Use commond mode CSV file `F` for cached values")
 	profile    = flag.String("profile", "", "Write profiling information to this file `F`")
 )
 
@@ -61,6 +62,18 @@ func main() {
 		return
 	}
 
+	delta := makeDelta()
+
+	if *deltaMode != "" {
+		f, err := os.Open(*deltaMode)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := delta.load(f); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	root := filepath.Clean(filepath.ToSlash(flag.Arg(0)))
 
 	writer := newWriter(os.Stdout)
@@ -74,7 +87,7 @@ func main() {
 	go idx.scan(root, nproc)
 
 	// Start all processors
-	proc := newProcessor(idx.sink(), writer, nproc)
+	proc := newProcessor(idx.sink(), writer, nproc, delta)
 	proc.run()
 
 	// Wait for all processors to finish processing files.
