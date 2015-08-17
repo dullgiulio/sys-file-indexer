@@ -238,7 +238,7 @@ func (p *props) writeBuf(uid uint, w *bytes.Buffer) {
 		fmt.Fprintf(w, queryMeta, p.modtime.Unix(), p.ctime.Unix(), uid, p.isize.X, p.isize.Y)
 		return
 	}
-	fmt.Fprintf(w, `file:"%d","0","%d","0","0","1","%d","0","`, uid, p.ctime.Unix(), p.ftype)
+	fmt.Fprintf(w, `file:"UID","0","%d","0","0","1","%d","0","`, p.ctime.Unix(), p.ftype)
 	w.WriteString(escape(p.fname))
 	fmt.Fprintf(w, `","%x","%x",`, p.ident, p.dident)
 	fmt.Fprintf(w, `"%s","%s","`, p.ext, p.mime)
@@ -248,6 +248,6 @@ func (p *props) writeBuf(uid uint, w *bytes.Buffer) {
 	// Write metadata
 	fmt.Fprintf(w, `meta:"0","%d","%d","0","0","0","",`, p.modtime.Unix(), p.ctime.Unix())
 	w.WriteString(`"0","0","0","","0","0","0","0","0","0",`)
-	fmt.Fprintf(w, `"%d","","%d","%d",`, uid, p.isize.X, p.isize.Y)
+	fmt.Fprintf(w, `"UID","","%d","%d",`, p.isize.X, p.isize.Y)
 	io.WriteString(w, "\"\",\"\",\"0\"\n")
 }

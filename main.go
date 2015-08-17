@@ -14,25 +14,55 @@ func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
-var singleMode = flag.Bool("single", false, "Output in single view mode")
-var sqlMode = flag.Bool("sql", false, "Output in SQL mode")
-var profile = flag.String("profile", "", "Write profiling information to this file")
+var (
+	singleMode = flag.Bool("single", false, "Output in single view mode")
+	sqlMode    = flag.Bool("sql", false, "Output in SQL mode")
+	fileMode   = flag.String("ofile", "", "Output the CSV for sys_file reading reading from `F`")
+	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
+	profile    = flag.String("profile", "", "Write profiling information to this file `F`")
+)
+
+func create(s string) *os.File {
+	f, err := os.Create(s)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return f
+}
 
 func main() {
 	flag.Parse()
 
+	// Enable profiling if requested regardless of the
+	// mode the tool is run in.
 	if *profile != "" {
-		f, err := os.Create(*profile)
+		pprof.StartCPUProfile(create(*profile))
+		defer pprof.StopCPUProfile()
+	}
+
+	// Handle the special split modes. In this modes,
+	// the user just wants to generate the true CSV to
+	// load into the database.
+	if *fileMode != "" || *metaMode != "" {
+		file := *fileMode
+		prefix := "file:"
+		if *metaMode != "" {
+			file = *metaMode
+			prefix = "meta:"
+		}
+		f, err := os.Open(file)
 		if err != nil {
 			log.Fatal(err)
 		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
+		sw := splitWriter{prefix, f}
+		if err := sw.write(os.Stdout); err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 
 	root := filepath.Clean(filepath.ToSlash(flag.Arg(0)))
 
-	// TODO: From options or default.
 	writer := newWriter(os.Stdout)
 	go writer.run()
 

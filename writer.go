@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"log"
+	"strings"
 )
 
 type writer struct {
@@ -47,4 +50,23 @@ func (w *writer) run() {
 
 func (w *writer) wait() {
 	<-w.done
+}
+
+type splitWriter struct {
+	prefix string
+	reader io.Reader
+}
+
+func (s splitWriter) write(w io.Writer) error {
+	var uid int64
+	scanner := bufio.NewScanner(s.reader)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, s.prefix) {
+			line = strings.Replace(line, "UID", fmt.Sprintf("%d", uid), 1)
+			fmt.Fprintln(w, line[len(s.prefix):])
+			uid++
+		}
+	}
+	return scanner.Err()
 }
