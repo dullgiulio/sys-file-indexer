@@ -47,15 +47,17 @@ func main() {
 	if *fileMode != "" || *metaMode != "" {
 		file := *fileMode
 		prefix := "file:"
+		uids := 1
 		if *metaMode != "" {
 			file = *metaMode
 			prefix = "meta:"
+			uids = 2
 		}
 		f, err := os.Open(file)
 		if err != nil {
 			log.Fatal(err)
 		}
-		sw := splitWriter{prefix, f}
+		sw := splitWriter{prefix, f, uids}
 		if err := sw.write(os.Stdout); err != nil {
 			log.Fatal(err)
 		}

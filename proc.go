@@ -292,7 +292,7 @@ func (p *props) writeNormal(w io.Writer) {
 	fmt.Fprintf(w, `","%x","%d",`, p.chash, p.size)
 	fmt.Fprintf(w, "\"%d\",\"%d\"\n", p.ctime.Unix(), p.modtime.Unix())
 	// Write metadata
-	fmt.Fprintf(w, `meta:"0","%d","%d","0","0","0","",`, p.modtime.Unix(), p.ctime.Unix())
+	fmt.Fprintf(w, `meta:"UID","0","%d","%d","0","0","0","",`, p.modtime.Unix(), p.ctime.Unix())
 	io.WriteString(w, `"0","0","0","","0","0","0","0","0","0",`)
 	fmt.Fprintf(w, `"UID","","%d","%d",`, p.isize.X, p.isize.Y)
 	io.WriteString(w, "\"\",\"\",\"0\"\n")

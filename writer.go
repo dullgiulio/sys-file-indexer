@@ -55,6 +55,7 @@ func (w *writer) wait() {
 type splitWriter struct {
 	prefix string
 	reader io.Reader
+	uids   int
 }
 
 func (s splitWriter) write(w io.Writer) error {
@@ -65,7 +66,7 @@ func (s splitWriter) write(w io.Writer) error {
 		if strings.HasPrefix(line, s.prefix) {
 			// Replacing the first occurrence of UID is safe here because file
 			// contains it as first field, meta as last but has only numeric fields.
-			line = strings.Replace(line, "UID", fmt.Sprintf("%d", uid), 1)
+			line = strings.Replace(line, "UID", fmt.Sprintf("%d", uid), s.uids)
 			if _, err := fmt.Fprintln(w, line[len(s.prefix):]); err != nil {
 				return err
 			}
