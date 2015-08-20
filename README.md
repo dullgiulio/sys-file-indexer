@@ -57,6 +57,18 @@ Generate metadata directly into the database (cannot use -delta):
 $ sys-file-indexer -sql | mysql ...
 ```
 
+### PARTITIONING
+
+sys-file-indexer can be run on multiple machines if that leads to an
+increase in I/O throughput.
+
+```
+host1$ sys-file-indexer -w 1 -wg 3 ... > result1.csv
+host2$ sys-file-indexer -w 2 -wg 3 ... > result2.csv
+host3$ sys-file-indexer -w 3 -wg 3 ... > result3.csv
+host1$ cat result1.csv result2.csv result3.csv > result.csv
+```
+
 ### TODO
 
 * Can scan multiple directories
