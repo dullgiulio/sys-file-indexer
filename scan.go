@@ -7,6 +7,14 @@ import (
 	"os"
 )
 
+func sumBytes(bs []byte) int {
+	var t int
+	for _, b := range bs {
+		t += int(b)
+	}
+	return t
+}
+
 type file struct {
 	os.FileInfo
 	path string
@@ -25,9 +33,11 @@ type indexer struct {
 	dirs  chan string
 	wn    chan int
 	out   chan file
+	ws    int
+	wi    int
 }
 
-func newIndexer() *indexer {
+func newIndexer(ws, wi int) *indexer {
 	return &indexer{
 		// dirs scheduled to be scanned.
 		stash: make(chan string),
@@ -37,7 +47,18 @@ func newIndexer() *indexer {
 		wn: make(chan int),
 		// out is for all found files.
 		out: make(chan file),
+		// number of workers
+		ws: ws,
+		// unmber of this worker
+		wi: wi,
 	}
+}
+
+func (i *indexer) canProcess(f file) bool {
+	if i.ws < 2 {
+		return true
+	}
+	return sumBytes([]byte(f.name()))%i.ws == i.wi
 }
 
 func (i *indexer) sink() <-chan file {
@@ -151,7 +172,9 @@ func (i *indexer) readdir(name string) {
 				log.Printf("Error: %s skipped. Symlinks are currently not supported!", name)
 			}
 			if f.Mode().IsRegular() {
-				i.out <- f
+				if i.canProcess(f) {
+					i.out <- f
+				}
 			}
 		}
 	}

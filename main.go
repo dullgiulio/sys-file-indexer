@@ -21,6 +21,8 @@ var (
 	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
 	deltaMode  = flag.String("delta", "", "Use commond mode CSV file `F` for cached values")
 	profile    = flag.String("profile", "", "Write profiling information to this file `F`")
+	workerN    = flag.Int("wg", 1, "Total number `N` of workers")
+	workerID   = flag.Int("w", 1, "Number `N` of this specific worker instance")
 )
 
 func create(s string) *os.File {
@@ -33,6 +35,14 @@ func create(s string) *os.File {
 
 func main() {
 	flag.Parse()
+
+	if *workerN < 1 {
+		log.Fatal("Number of workers should be at least one")
+	}
+
+	if *workerID < 1 || *workerID > *workerN {
+		log.Fatal("Worker number is not valid: must be between 1 and `-wg N`")
+	}
 
 	// Enable profiling if requested regardless of the
 	// mode the tool is run in.
@@ -85,7 +95,7 @@ func main() {
 	nproc := runtime.NumCPU()
 
 	// Start scanning the directory
-	idx := newIndexer()
+	idx := newIndexer(*workerN, *workerID-1)
 	go idx.scan(root, nproc)
 
 	// Start all processors
