@@ -17,8 +17,8 @@ type writer struct {
 func newWriter(w io.Writer) *writer {
 	return &writer{
 		w: w,
-		// TODO: It's a good idea to buffer this, esp. in SQL mode.
-		ch:   make(chan string),
+		// It's a good idea to buffer this, esp. in SQL mode.
+		ch:   make(chan string, 16),
 		done: make(chan struct{}),
 	}
 }
