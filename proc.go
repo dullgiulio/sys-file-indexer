@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
 	"hash"
 	"image"
 	_ "image/gif"
