@@ -25,6 +25,7 @@ var (
 	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
 	deltaMode  = flag.String("delta", "", "Use commond mode CSV file `F` for cached values")
 	profile    = flag.String("profile", "", "Write profiling information to this file `F`")
+	multiplier = flag.Int("multi", 3, "Number `N` of workers to run for each CPU")
 	workerN    = flag.Int("wg", 1, "Total number `N` of workers")
 	workerID   = flag.Int("w", 1, "Number `N` of this specific worker instance")
 )
@@ -46,6 +47,10 @@ func main() {
 
 	if *workerID < 1 || *workerID > *workerN {
 		log.Fatal("Worker number is not valid: must be between 1 and `-wg N`")
+	}
+
+	if *multiplier < 1 {
+		*multiplier = 1
 	}
 
 	// Enable profiling if requested regardless of the
@@ -96,7 +101,7 @@ func main() {
 	go writer.run()
 
 	// Number of processor workers to process the files
-	nproc := runtime.NumCPU()
+	nproc := runtime.NumCPU() * *multiplier
 
 	// Start scanning the directory
 	idx := newIndexer(*workerN, *workerID-1)
