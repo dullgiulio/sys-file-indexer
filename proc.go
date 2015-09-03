@@ -200,10 +200,18 @@ func mapType(mime string) int {
 	return 0 // unknown
 }
 
+func fileExt(fname string) string {
+	ext := filepath.Ext(fname)
+	if ext != "" {
+		ext = ext[1:]
+	}
+	return ext
+}
+
 // Fast operations to fill props struct
 func newProps(h hash.Hash, f file, name string) *props {
 	fname := stripRoot(name)
-	ext := filepath.Ext(fname)
+	ext := fileExt(fname)
 	dir := filepath.Dir(fname)
 	ident := strhash(fname, h)
 	p := &props{
