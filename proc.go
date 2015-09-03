@@ -179,7 +179,7 @@ func stripRoot(s string) string {
 func mapType(mime string) int {
 	n := strings.Index(mime, "/")
 	if n >= 0 {
-		mime = mime[:n-1]
+		mime = mime[:n]
 	}
 	switch mime {
 	case "text":
