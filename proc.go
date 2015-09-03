@@ -229,7 +229,12 @@ func newProps(h hash.Hash, f file, name string) *props {
 
 // Slower operations to fill props struct
 func (p *props) load(h hash.Hash, name string) *props {
-	p.mime = mime.TypeByExtension(p.ext)
+	// Empty files always have this special MIME type
+	if p.size == 0 {
+		p.mime = "inode/x-empty"
+	} else {
+		p.mime = mime.TypeByExtension(p.ext)
+	}
 	r, err := os.Open(name)
 	if err != nil {
 		log.Print(name, ": Props: ", err)
