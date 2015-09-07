@@ -6,6 +6,7 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -21,9 +22,10 @@ func init() {
 var (
 	singleMode = flag.Bool("single", false, "Output in single view mode")
 	sqlMode    = flag.Bool("sql", false, "Output in SQL mode")
+	osqlMode   = flag.String("osql", "", "Output SQL parsing common CSV from file `F` or stdin")
 	fileMode   = flag.String("ofile", "", "Output the CSV for sys_file reading reading from `F`")
 	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
-	deltaMode  = flag.String("delta", "", "Use commond mode CSV file `F` for cached values")
+	deltaMode  = flag.String("delta", "", "Use common mode CSV file `F` for cached values")
 	profile    = flag.String("profile", "", "Write profiling information to this file `F`")
 	multiplier = flag.Int("multi", 3, "Number `N` of workers to run for each CPU")
 	workerN    = flag.Int("wg", 1, "Total number `N` of workers")
@@ -40,6 +42,29 @@ func create(s string) *os.File {
 
 func main() {
 	flag.Parse()
+
+	// Special mode that transforms CSV to SQL.
+	if *osqlMode != "" {
+		var r io.Reader
+		if *osqlMode == "-" {
+			r = os.Stdin
+		} else {
+			fr, err := os.Open(*osqlMode)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer fr.Close()
+			r = fr
+		}
+		pr := newPrefixReader(r)
+		writer := newWriter(os.Stdout)
+		go writer.run()
+		if err := loadCSV(pr, writer); err != nil {
+			log.Fatal(err)
+		}
+		writer.wait()
+		return
+	}
 
 	if *workerN < 1 {
 		log.Fatal("Number of workers should be at least one")
