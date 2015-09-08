@@ -40,7 +40,10 @@ sys-file-indexer has the following modes of operation:
 3. SQL mode: outputs readily usable SQL INSERT statements that can be
    piped directly to the database.
 
-4. Single mode: outputs one single CSV dataset.  Useful for testing onty.
+4. SQL transform mode: reads a normal mode CSV and outputs SQL statements.
+   Can be used to have SQL output and using partitioning (in two steps.)
+
+5. Single mode: outputs one single CSV dataset.  Useful for testing onty.
 
 EXAMPLE
 
@@ -58,6 +61,9 @@ $ sys-file-indexer -ometa=normal.csv >sys_file_metadata.csv
 
 Generate metadata directly into the database (cannot use -delta):
 $ sys-file-indexer -sql | mysql ...
+
+Transform a normal-mode CSV into SQL:
+$ sys-file-indexer -osql sys_file_metadata.csv | mysql ...
 
 PARTITIONING
 
