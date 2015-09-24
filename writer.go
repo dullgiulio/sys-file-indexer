@@ -13,17 +13,28 @@ import (
 )
 
 type writer struct {
-	w    io.Writer
-	ch   chan string
-	done chan struct{}
+	w        io.Writer
+	ch       chan string
+	done     chan struct{}
+	min, inc int
+	transf   bool
 }
 
-func newWriter(w io.Writer) *writer {
+func newWriter(w io.Writer, transform bool, min, inc int) *writer {
+	if min < 1 {
+		min = 1
+	}
+	if inc < 1 {
+		inc = 1
+	}
 	return &writer{
 		w: w,
 		// It's a good idea to buffer this, esp. in SQL mode.
-		ch:   make(chan string, 16),
-		done: make(chan struct{}),
+		ch:     make(chan string, 16),
+		done:   make(chan struct{}),
+		min:    min,
+		inc:    inc,
+		transf: transform,
 	}
 }
 
@@ -36,13 +47,11 @@ func (w *writer) close() {
 }
 
 func (w *writer) run() {
-	var uid int64
+	uid := w.min
 	for s := range w.ch {
-		uid++
-		// In SQL mode we need UID to be set; see comment below on how
-		// this is operation is safe.
-		if *sqlMode {
-			s = strings.Replace(s, "UID", fmt.Sprintf("%d", uid), 1)
+		uid += w.inc
+		if w.transf {
+			s = strings.Replace(s, "UID", fmt.Sprintf("%d", uid), 2)
 		}
 		if _, err := io.WriteString(w.w, s); err != nil {
 			log.Print("Write to result: ", err)
@@ -60,10 +69,18 @@ type splitWriter struct {
 	prefix string
 	reader io.Reader
 	uids   int
+	min    int
+	inc    int
 }
 
 func (s splitWriter) write(w io.Writer) error {
-	var uid int64
+	if s.min < 1 {
+		s.min = 1
+	}
+	if s.inc < 1 {
+		s.inc = 1
+	}
+	uid := s.min
 	scanner := bufio.NewScanner(s.reader)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -74,7 +91,7 @@ func (s splitWriter) write(w io.Writer) error {
 			if _, err := fmt.Fprintln(w, line[len(s.prefix):]); err != nil {
 				return err
 			}
-			uid++
+			uid += s.inc
 		}
 	}
 	return scanner.Err()

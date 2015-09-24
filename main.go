@@ -43,6 +43,17 @@ func create(s string) *os.File {
 func main() {
 	flag.Parse()
 
+	if *workerN < 1 {
+		log.Fatal("Number of workers should be at least one")
+	}
+
+	if *workerID < 1 || *workerID > *workerN {
+		log.Fatal("Worker number is not valid: must be between 1 and `-wg N`")
+	}
+
+	// Not output UID, but real numbers
+	transform := *sqlMode || *osqlMode != ""
+
 	// Special mode that transforms CSV to SQL.
 	if *osqlMode != "" {
 		var r io.Reader
@@ -57,21 +68,13 @@ func main() {
 			r = fr
 		}
 		pr := newPrefixReader(r)
-		writer := newWriter(os.Stdout)
+		writer := newWriter(os.Stdout, transform, *workerID, *workerN)
 		go writer.run()
 		if err := loadCSV(pr, writer); err != nil {
 			log.Fatal(err)
 		}
 		writer.wait()
 		return
-	}
-
-	if *workerN < 1 {
-		log.Fatal("Number of workers should be at least one")
-	}
-
-	if *workerID < 1 || *workerID > *workerN {
-		log.Fatal("Worker number is not valid: must be between 1 and `-wg N`")
 	}
 
 	if *multiplier < 1 {
@@ -101,7 +104,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		sw := splitWriter{prefix, f, uids}
+		sw := splitWriter{prefix, f, uids, *workerID, *workerN}
 		if err := sw.write(os.Stdout); err != nil {
 			log.Fatal(err)
 		}
@@ -122,7 +125,7 @@ func main() {
 
 	root := filepath.Clean(filepath.ToSlash(flag.Arg(0)))
 
-	writer := newWriter(os.Stdout)
+	writer := newWriter(os.Stdout, transform, *workerID, *workerN)
 	go writer.run()
 
 	// Number of processor workers to process the files
