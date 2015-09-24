@@ -65,6 +65,11 @@ Transform a normal-mode CSV into SQL:
 $ sys-file-indexer -osql sys_file_metadata.csv | mysql ...
 ```
 
+Delta mode and output to SQL (use ```tee``` to update the normale file in one go):
+```
+$ sys-file-indexer -delta normal.csv | sys-file-indexer -osql - | mysql ...
+```
+
 ### PARTITIONING
 
 sys-file-indexer can be run on multiple machines if that leads to an
