@@ -228,7 +228,7 @@ func newProps(h hash.Hash, f file, name string) *props {
 }
 
 // Slower operations to fill props struct
-func (p *props) load(h hash.Hash, name string) *props {
+func (p *props) load(h hash.Hash, name string) {
 	// Empty files always have this special MIME type
 	if p.size == 0 {
 		p.mime = "inode/x-empty"
@@ -238,7 +238,7 @@ func (p *props) load(h hash.Hash, name string) *props {
 	r, err := os.Open(name)
 	if err != nil {
 		log.Print(name, ": Props: ", err)
-		return p
+		return
 	}
 	defer r.Close()
 	p.ftype = mapType(p.mime)
@@ -252,20 +252,19 @@ func (p *props) load(h hash.Hash, name string) *props {
 	}
 	// Non-images are completely processed at this point
 	if !strings.HasPrefix(p.mime, "image/") {
-		return p
+		return
 	}
 	// Image-specific processing
 	if _, err := r.Seek(0, 0); err != nil {
 		log.Print(name, ": Seek: ", err)
-		return p
+		return
 	}
 	imgconf, _, err := image.DecodeConfig(r)
 	if err != nil {
 		log.Print(name, ": Image decoder: ", err)
-		return p
+		return
 	}
 	p.isize = image.Point{imgconf.Width, imgconf.Height}
-	return p
 }
 
 func escape(s string) string {

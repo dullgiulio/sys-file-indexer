@@ -20,7 +20,7 @@ func TestMapFtype(t *testing.T) {
 	}
 	for i := range equivs {
 		if val := mapType(equivs[i].mime); val != equivs[i].val {
-			t.Errorf("Invalid MIME: expected %d got %d for %s", equivs[i].val, val, equivs[i].mime)
+			t.Errorf("invalid MIME: expected %d got %d for %s", equivs[i].val, val, equivs[i].mime)
 		}
 	}
 }

@@ -97,17 +97,17 @@ func (p *prefixReader) Read(buf []byte) (n int, err error) {
 		switch prefix {
 		case "file:":
 			if hasFile {
-				return 0, errors.New("Invalid line: 'file:' line expected")
+				return 0, errors.New("invalid line: 'file:' line expected")
 			}
 			hasFile = true
 		case "meta:":
 			if !hasFile {
-				return 0, errors.New("Invalid line: 'meta:' line expected")
+				return 0, errors.New("invalid line: 'meta:' line expected")
 			}
 			readReady = true
 			p.buf.WriteByte(',') // append 'meta:' to the last 'file:' line
 		default:
-			return 0, errors.New("Invalid line: must start with 'meta:' or 'file:'")
+			return 0, errors.New("invalid line: must start with 'meta:' or 'file:'")
 		}
 		p.buf.WriteString(line)
 		if !readReady {
