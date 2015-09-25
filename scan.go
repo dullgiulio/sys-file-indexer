@@ -165,15 +165,15 @@ func (i *indexer) readdir(name string) {
 			}
 			return
 		}
-		for j := range fi {
-			f := makeFile(fi[j], name)
+		for _, finfo := range fi {
+			f := makeFile(finfo, name)
 			if f.IsDir() {
 				i.stash <- f.name()
 				continue
 			}
 			// TODO: Handling of symlinks outside the root!
-			if f.Mode()&os.ModeSymlink != 0 {
-				log.Printf("Error: %s skipped. Symlinks are currently not supported!", name)
+			if f.Mode()&os.ModeSymlink == os.ModeSymlink {
+				log.Printf("%s skipped: symlinks are currently not supported!", name)
 			}
 			if f.Mode().IsRegular() {
 				if i.canProcess(f) {
