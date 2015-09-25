@@ -34,6 +34,34 @@ const queryMeta = `INSERT INTO sys_file_metadata (tstamp, crdate, file, width, h
 ("%d","%d","UID","%d","%d");
 `
 
+var knownMIME = map[string]string{
+	"xls":  "application/vnd.ms-excel",
+	"doc":  "application/msword",
+	"pps":  "application/vnd.ms-powerpoint",
+	"ods":  "application/vnd.oasis.opendocument.spreadsheet",
+	"odt":  "application/vnd.oasis.opendocument.text",
+	"pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	"docm": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	"7z":   "application/x-7z-compressed",
+	"exe":  "application/x-dosexec",
+	"mm":   "application/x-freemind",
+	"mdb":  "application/x-msaccess",
+	"rar":  "application/x-rar",
+	"swf":  "application/x-shockwave-flash",
+	"xml":  "application/xml",
+	"wav":  "audio/x-wav",
+	"tif":  "image/tiff",
+	"bmp":  "image/x-ms-bmp",
+	"rtf":  "text/rtf",
+	"mp4":  "video/mp4",
+	"mpg":  "video/mpeg",
+	"mov":  "video/quicktime",
+	"flv":  "video/x-flv",
+	"wmv":  "video/x-ms-asf",
+	"avi":  "video/x-msvideo",
+}
+
 type processor struct {
 	nproc  int
 	delta  delta
@@ -121,6 +149,14 @@ func filehash(name string, h hash.Hash, r io.Reader) []byte {
 		return nil
 	}
 	return h.Sum(nil)
+}
+
+func guessMIME(ext string) string {
+	ext = strings.ToLower(ext)
+	if m, ok := knownMIME[ext]; ok {
+		return m
+	}
+	return mime.TypeByExtension(ext)
 }
 
 func sniffMIME(name string, r *os.File) string {
@@ -233,7 +269,7 @@ func (p *props) load(h hash.Hash, name string) {
 	if p.size == 0 {
 		p.mime = "inode/x-empty"
 	} else {
-		p.mime = mime.TypeByExtension(p.ext)
+		p.mime = guessMIME(p.ext)
 	}
 	r, err := os.Open(name)
 	if err != nil {
