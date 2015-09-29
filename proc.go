@@ -35,31 +35,36 @@ const queryMeta = `INSERT INTO sys_file_metadata (tstamp, crdate, file, width, h
 `
 
 var knownMIME = map[string]string{
-	"xls":  "application/vnd.ms-excel",
-	"doc":  "application/msword",
-	"pps":  "application/vnd.ms-powerpoint",
-	"ods":  "application/vnd.oasis.opendocument.spreadsheet",
-	"odt":  "application/vnd.oasis.opendocument.text",
-	"pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-	"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-	"docm": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-	"7z":   "application/x-7z-compressed",
-	"exe":  "application/x-dosexec",
-	"mm":   "application/x-freemind",
-	"mdb":  "application/x-msaccess",
-	"rar":  "application/x-rar",
-	"swf":  "application/x-shockwave-flash",
-	"xml":  "application/xml",
-	"wav":  "audio/x-wav",
-	"tif":  "image/tiff",
-	"bmp":  "image/x-ms-bmp",
-	"rtf":  "text/rtf",
-	"mp4":  "video/mp4",
-	"mpg":  "video/mpeg",
-	"mov":  "video/quicktime",
-	"flv":  "video/x-flv",
-	"wmv":  "video/x-ms-asf",
-	"avi":  "video/x-msvideo",
+	"xls":      "application/vnd.ms-excel",
+	"doc":      "application/msword",
+	"docx":     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	"pps":      "application/vnd.ms-powerpoint",
+	"ppt":      "application/vnd.ms-powerpoint",
+	"pptm":     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	"ods":      "application/vnd.oasis.opendocument.spreadsheet",
+	"odt":      "application/vnd.oasis.opendocument.text",
+	"pptx":     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	"xlsx":     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	"xlsm":     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	"docm":     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	"7z":       "application/x-7z-compressed",
+	"exe":      "application/x-dosexec",
+	"mm":       "application/x-freemind",
+	"mdb":      "application/x-msaccess",
+	"rar":      "application/x-rar",
+	"swf":      "application/x-shockwave-flash",
+	"xml":      "application/xml",
+	"wav":      "audio/x-wav",
+	"tif":      "image/tiff",
+	"bmp":      "image/x-ms-bmp",
+	"rtf":      "text/rtf",
+	"mp4":      "video/mp4",
+	"mpg":      "video/mpeg",
+	"mov":      "video/quicktime",
+	"flv":      "video/x-flv",
+	"wmv":      "video/x-ms-asf",
+	"avi":      "video/x-msvideo",
+	"htaccess": "text/plain",
 }
 
 type processor struct {
@@ -277,15 +282,19 @@ func (p *props) load(h hash.Hash, name string) {
 		return
 	}
 	defer r.Close()
-	p.ftype = mapType(p.mime)
-	// TODO: this is quite unreadable
-	copy(p.chash[:], filehash(name, h, r))
-	copy(p.dident[:], strhash(p.dir, h))
 	// If the extension is empty, we need to detect
 	// the MIME type via file contents
 	if p.mime == "" {
 		p.mime = sniffMIME(name, r)
 	}
+	p.ftype = mapType(p.mime)
+	if _, err := r.Seek(0, 0); err != nil {
+		log.Print(name, ": Seek: ", err)
+		return
+	}
+	// TODO: this is quite unreadable
+	copy(p.chash[:], filehash(name, h, r))
+	copy(p.dident[:], strhash(p.dir, h))
 	// Non-images are completely processed at this point
 	if !strings.HasPrefix(p.mime, "image/") {
 		return
