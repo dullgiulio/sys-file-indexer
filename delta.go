@@ -15,6 +15,21 @@ import (
 	"strings"
 )
 
+type deltaFiles []string
+
+func (f *deltaFiles) String() string {
+	return strings.Join(*f, "; ")
+}
+
+func (f *deltaFiles) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
+func (f *deltaFiles) IsSet() bool {
+	return len(*f) > 0
+}
+
 type entry struct {
 	mtime      int64
 	file, meta string

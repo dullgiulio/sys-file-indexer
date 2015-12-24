@@ -97,6 +97,7 @@ func newProcessor(in <-chan file, w *writer, n int, d delta) *processor {
 
 func (p *processor) runOne() {
 	defer p.wg.Done()
+	useDelta := len(p.delta) > 0
 	for f := range p.in {
 		var done bool
 		// Get one of the available tool structs
@@ -105,7 +106,7 @@ func (p *processor) runOne() {
 		name := f.name()
 		pr := newProps(tools.hash, f, name)
 		// If in delta mode, see if there is a cached delta entry
-		if *deltaMode != "" {
+		if useDelta {
 			entry := p.delta[pr.ident]
 			// If we have an entry and it's modtime is unchanged, use cached entry
 			if entry != nil && f.ModTime().Unix() == entry.mtime {

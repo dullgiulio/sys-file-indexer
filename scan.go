@@ -5,10 +5,10 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
+	"path"
 )
 
 func sumBytes(bs []byte) int {
@@ -22,14 +22,15 @@ func sumBytes(bs []byte) int {
 type file struct {
 	os.FileInfo
 	path string
+	base string
 }
 
-func makeFile(f os.FileInfo, path string) file {
-	return file{f, path}
+func makeFile(f os.FileInfo, name string) file {
+	return file{f, path.Dir(name), path.Base(name)}
 }
 
 func (f *file) name() string {
-	return fmt.Sprintf("%s/%s", f.path, f.FileInfo.Name())
+	return path.Join(f.path, f.base)
 }
 
 type indexer struct {
@@ -150,31 +151,45 @@ func (s *indexer) dispatch(n int) {
 	close(s.wn)
 }
 
-func (i *indexer) readdir(name string) {
-	dir, err := os.Open(name)
+func (i *indexer) readdir(dirname string) {
+	dir, err := os.Open(dirname)
 	if err != nil {
 		log.Print(err)
 		return
 	}
 	defer dir.Close()
 	for {
-		fi, err := dir.Readdir(255)
+		names, err := dir.Readdirnames(1024)
 		if err != nil {
 			if err != io.EOF {
 				log.Print(err)
 			}
 			return
 		}
-		for _, finfo := range fi {
+		for _, name := range names {
+			name = path.Join(dirname, name)
+			finfo, err := os.Lstat(name)
+			if err != nil {
+				log.Print(err)
+				continue
+			}
 			f := makeFile(finfo, name)
+			// For synlinks, update the finfo with that of the file
+			// pointed by the symlink, but keep the link name.
+			if f.Mode()&os.ModeSymlink == os.ModeSymlink {
+				finfo, err = os.Stat(name)
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+				f.FileInfo = finfo
+			}
+			// Subdirectories are queued for scanning
 			if f.IsDir() {
 				i.stash <- f.name()
 				continue
 			}
-			// TODO: Handling of symlinks outside the root!
-			if f.Mode()&os.ModeSymlink == os.ModeSymlink {
-				log.Printf("%s skipped: symlinks are currently not supported!", name)
-			}
+			// Regular files are queued for processing
 			if f.Mode().IsRegular() {
 				if i.canProcess(f) {
 					i.out <- f

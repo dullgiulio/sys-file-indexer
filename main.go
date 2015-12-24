@@ -14,22 +14,17 @@ import (
 	"runtime/pprof"
 )
 
-func init() {
-	// XXX: Until Go 1.5
-	runtime.GOMAXPROCS(runtime.NumCPU())
-}
-
 var (
 	singleMode = flag.Bool("single", false, "Output in single view mode")
 	sqlMode    = flag.Bool("sql", false, "Output in SQL mode")
 	osqlMode   = flag.String("osql", "", "Output SQL parsing common CSV from file `F` or stdin")
 	fileMode   = flag.String("ofile", "", "Output the CSV for sys_file reading reading from `F`")
 	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
-	deltaMode  = flag.String("delta", "", "Use common mode CSV file `F` for cached values")
 	profile    = flag.String("profile", "", "Write profiling information to this file `F`")
 	multiplier = flag.Int("multi", 3, "Number `N` of workers to run for each CPU")
 	workerN    = flag.Int("wg", 1, "Total number `N` of workers")
 	workerID   = flag.Int("w", 1, "Number `N` of this specific worker instance")
+	deltas     deltaFiles // Custom type to catch several files if flag is repeated
 )
 
 func create(s string) *os.File {
@@ -41,6 +36,7 @@ func create(s string) *os.File {
 }
 
 func main() {
+	flag.Var(&deltas, "delta", "Use common mode CSV file `F` for cached values. Flag can be repeated.")
 	flag.Parse()
 
 	if *workerN < 1 {
@@ -113,13 +109,15 @@ func main() {
 
 	delta := makeDelta()
 
-	if *deltaMode != "" {
-		f, err := os.Open(*deltaMode)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := delta.load(f); err != nil {
-			log.Fatal(err)
+	if deltas.IsSet() {
+		for _, d := range deltas {
+			f, err := os.Open(d)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := delta.load(f); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
