@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"io"
 	"log"
@@ -20,6 +21,7 @@ var (
 	osqlMode   = flag.String("osql", "", "Output SQL parsing common CSV from file `F` or stdin")
 	fileMode   = flag.String("ofile", "", "Output the CSV for sys_file reading reading from `F`")
 	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
+	dumpDB     = flag.String("dump", "", "Output common CSV from tables in database `DB` (full DNS)")
 	profile    = flag.String("profile", "", "Write profiling information to this file `F`")
 	multiplier = flag.Int("multi", 3, "Number `N` of workers to run for each CPU")
 	workerN    = flag.Int("wg", 1, "Total number `N` of workers")
@@ -38,6 +40,11 @@ func create(s string) *os.File {
 func main() {
 	flag.Var(&deltas, "delta", "Use common mode CSV file `F` for cached values. Flag can be repeated.")
 	flag.Parse()
+
+	if *dumpDB != "" {
+		dumpDatabase(*dumpDB, bufio.NewWriter(os.Stdout))
+		return
+	}
 
 	if *workerN < 1 {
 		log.Fatal("Number of workers should be at least one")

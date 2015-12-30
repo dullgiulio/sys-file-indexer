@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha1"
+	"database/sql"
 	"fmt"
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
@@ -24,13 +25,22 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
-const queryFile = `INSERT INTO sys_file (uid, pid, tstamp, last_indexed, missing, storage, type, metadata,
+const queryInsertFile = `INSERT INTO sys_file (uid, pid, tstamp, last_indexed, missing, storage, type, metadata,
 	identifier, identifier_hash, folder_hash, extension, mime_type, name, sha1, size, creation_date, modification_date) VALUES
 ("UID","0","%d","0","0","1","%d","0","%s","%x","%x","%s","%s","%s","%x","%d","%d","%d");
 `
-const queryMeta = `INSERT INTO sys_file_metadata (tstamp, crdate, file, width, height) VALUES
+
+const querySelect = `SELECT f.uid, f.pid, f.tstamp, f.last_indexed, f.missing,
+    f.storage, f.type, f.metadata, f.identifier, f.identifier_hash, f.folder_hash, f.extension,
+    f.mime_type, f.name, f.sha1, f.size, f.creation_date, f.modification_date,
+    m.uid, m.tstamp, m.crdate, m.file, m.width, m.height
+    FROM sys_file f JOIN sys_file_metadata m ON f.uid=m.file`
+
+const queryInsertMeta = `INSERT INTO sys_file_metadata (tstamp, crdate, file, width, height) VALUES
 ("%d","%d","UID","%d","%d");
 `
 
@@ -186,6 +196,10 @@ func sniffMIME(name string, r *os.File) string {
 
 // Metadata to save about a file
 type props struct {
+	// UID or zero for unassigned
+	uid int
+	// UID of metadata, or zero for unassigned
+	metaUid int
 	// SHA1 hash of file path + name
 	ident digest
 	// SHA1 hash of directory
@@ -340,15 +354,23 @@ func (p *props) writeSingle(w io.Writer) {
 }
 
 func (p *props) writeSQL(w io.Writer) {
-	fmt.Fprintf(w, queryFile, p.ctime.Unix(), p.ftype, escape(p.fname),
+	fmt.Fprintf(w, queryInsertFile, p.ctime.Unix(), p.ftype, escape(p.fname),
 		p.ident, p.dident, p.ext, p.mime, escape(p.bname), p.chash, p.size,
 		p.ctime.Unix(), p.modtime.Unix())
-	fmt.Fprintf(w, queryMeta, p.modtime.Unix(), p.ctime.Unix(), p.isize.X, p.isize.Y)
+	fmt.Fprintf(w, queryInsertMeta, p.modtime.Unix(), p.ctime.Unix(), p.isize.X, p.isize.Y)
 }
 
 func (p *props) writeNormal(w io.Writer) {
+	uid := "UID"
+	if p.uid != 0 {
+		uid = fmt.Sprintf("%d", p.uid)
+	}
+	metaUid := "UID"
+	if p.metaUid != 0 {
+		uid = fmt.Sprintf("%d", p.metaUid)
+	}
 	// Write file entry
-	fmt.Fprintf(w, `file:"UID","0","%d","0","0","1","%d","0","`, p.ctime.Unix(), p.ftype)
+	fmt.Fprintf(w, `file:"%s","0","%d","0","0","1","%d","0","`, uid, p.ctime.Unix(), p.ftype)
 	io.WriteString(w, escape(p.fname))
 	fmt.Fprintf(w, `","%x","%x",`, p.ident, p.dident)
 	fmt.Fprintf(w, `"%s","%s","`, p.ext, p.mime)
@@ -356,8 +378,31 @@ func (p *props) writeNormal(w io.Writer) {
 	fmt.Fprintf(w, `","%x","%d",`, p.chash, p.size)
 	fmt.Fprintf(w, "\"%d\",\"%d\"\n", p.ctime.Unix(), p.modtime.Unix())
 	// Write metadata
-	fmt.Fprintf(w, `meta:"UID","0","%d","%d","0","0","0","",`, p.modtime.Unix(), p.ctime.Unix())
+	fmt.Fprintf(w, `meta:"%s","0","%d","%d","0","0","0","",`, metaUid, p.modtime.Unix(), p.ctime.Unix())
 	io.WriteString(w, `"0","0","0","","0","0","0","0","0","0",`)
 	fmt.Fprintf(w, `"UID","","%d","%d",`, p.isize.X, p.isize.Y)
 	io.WriteString(w, "\"\",\"\",\"0\"\n")
+}
+
+func dumpDatabase(dsn string, w io.Writer) error {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return fmt.Errorf("cannot open DB: %s", err)
+	}
+	rows, err := db.Query(querySelect)
+	if err != nil {
+		return fmt.Errorf("cannot execute query: %s", err)
+	}
+	defer rows.Close()
+	p := &props{}
+	for rows.Next() {
+		// TODO: ctime and modtime are written more than once, remove from fields.
+		if err := rows.Scan(&p.uid, &p.ctime, &p.ftype, &p.fname, &p.ident,
+			&p.dident, &p.ext, &p.mime, &p.bname, &p.chash, &p.size, &p.ctime,
+			&p.modtime, &p.metaUid, &p.modtime, &p.ctime, &p.isize.X, &p.isize.Y); err != nil {
+			return fmt.Errorf("reading row failed: %s", err)
+		}
+		p.writeNormal(w)
+	}
+	return nil
 }
