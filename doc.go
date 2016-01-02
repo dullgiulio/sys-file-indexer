@@ -70,7 +70,12 @@ Delta mode and output to SQL (use tee(1) to update the normal
 $ sys-file-indexer -delta normal.csv | sys-file-indexer -osql - | mysql ...
 
 In delta mode you can specify several files to load as follows:
-$ sys-file-indexer -delta a.csv -delta b.csv
+$ sys-file-indexer -delta a.csv -delta b.csv DIR
+
+When specifying multiple deltas, the newest version of each duplicate
+record is retained. To merge several deltas, use the -delta switch
+multiple times and do not specify a directory to scan. The merged delta
+will be printed to standard output.
 
 PARTITIONING
 

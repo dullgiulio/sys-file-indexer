@@ -81,6 +81,13 @@ func (d delta) load(r io.Reader) error {
 		}
 		var key digest
 		copy(key[:], hash)
+		// If there is already an entry and it has is newer than the one we
+		// are trying to insert, do not override the newest entry.
+		if e, ok := d[key]; ok {
+			if e.mtime >= mtime {
+				continue
+			}
+		}
 		d[key] = &entry{
 			mtime: mtime,
 			file:  fline,
@@ -88,4 +95,13 @@ func (d delta) load(r io.Reader) error {
 		}
 	}
 	return scanner.Err()
+}
+
+func (d delta) writeTo(w io.Writer) error {
+	for _, e := range d {
+		if _, err := fmt.Fprintf(w, "file:%s\nmeta:%s\n", e.file, e.meta); err != nil {
+			return err
+		}
+	}
+	return nil
 }

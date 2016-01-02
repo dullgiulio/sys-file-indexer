@@ -41,6 +41,14 @@ func main() {
 	flag.Var(&deltas, "delta", "Use common mode CSV file `F` for cached values. Flag can be repeated.")
 	flag.Parse()
 
+	// Enable profiling if requested regardless of the
+	// mode the tool is run in.
+	if *profile != "" {
+		pprof.StartCPUProfile(create(*profile))
+		defer pprof.StopCPUProfile()
+	}
+
+	// Create a CSV cache file by reading DB tables.
 	if *dumpDB != "" {
 		dumpDatabase(*dumpDB, bufio.NewWriter(os.Stdout))
 		return
@@ -52,6 +60,15 @@ func main() {
 
 	if *workerID < 1 || *workerID > *workerN {
 		log.Fatal("Worker number is not valid: must be between 1 and `-wg N`")
+	}
+
+	if *multiplier < 1 {
+		*multiplier = 1
+	}
+
+	root := flag.Arg(0)
+	if root != "" {
+		root = filepath.Clean(filepath.ToSlash(root))
 	}
 
 	// Not output UID, but real numbers
@@ -78,17 +95,6 @@ func main() {
 		}
 		writer.wait()
 		return
-	}
-
-	if *multiplier < 1 {
-		*multiplier = 1
-	}
-
-	// Enable profiling if requested regardless of the
-	// mode the tool is run in.
-	if *profile != "" {
-		pprof.StartCPUProfile(create(*profile))
-		defer pprof.StopCPUProfile()
 	}
 
 	// Handle the special split modes. In this modes,
@@ -128,7 +134,16 @@ func main() {
 		}
 	}
 
-	root := filepath.Clean(filepath.ToSlash(flag.Arg(0)))
+	if root == "" && !deltas.IsSet() {
+		log.Fatal("You need to specify at least one -delta CSV file")
+	}
+
+	// We don't have a directory to scan, just print
+	// out the resulting loaded delta.
+	if root == "" {
+		delta.writeTo(os.Stdout)
+		return
+	}
 
 	writer := newWriter(os.Stdout, transform, *workerID, *workerN)
 	go writer.run()
