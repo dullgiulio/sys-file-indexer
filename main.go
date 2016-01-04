@@ -21,7 +21,7 @@ var (
 	osqlMode   = flag.String("osql", "", "Output SQL parsing common CSV from file `F` or stdin")
 	fileMode   = flag.String("ofile", "", "Output the CSV for sys_file reading reading from `F`")
 	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
-	dumpDB     = flag.String("dump", "", "Output common CSV from tables in database `DB` (full DNS)")
+	dumpDB     = flag.String("dump", "", "Output common CSV from tables in database `DB` (full DSN)")
 	profile    = flag.String("profile", "", "Write profiling information to this file `F`")
 	multiplier = flag.Int("multi", 3, "Number `N` of workers to run for each CPU")
 	workerN    = flag.Int("wg", 1, "Total number `N` of workers")
@@ -50,7 +50,13 @@ func main() {
 
 	// Create a CSV cache file by reading DB tables.
 	if *dumpDB != "" {
-		dumpDatabase(*dumpDB, bufio.NewWriter(os.Stdout))
+		w := bufio.NewWriter(os.Stdout)
+		if err := dumpDatabase(*dumpDB, w); err != nil {
+			log.Fatal("Cannot export from DB: ", err)
+		}
+		if err := w.Flush(); err != nil {
+			log.Fatal("Cannot write: ", err)
+		}
 		return
 	}
 

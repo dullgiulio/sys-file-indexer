@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
@@ -34,11 +35,11 @@ const queryInsertFile = `INSERT INTO sys_file (uid, pid, tstamp, last_indexed, m
 ("UID","0","%d","0","0","1","%d","0","%s","%x","%x","%s","%s","%s","%x","%d","%d","%d");
 `
 
-const querySelect = `SELECT f.uid, f.pid, f.tstamp, f.last_indexed, f.missing,
-    f.storage, f.type, f.metadata, f.identifier, f.identifier_hash, f.folder_hash, f.extension,
-    f.mime_type, f.name, f.sha1, f.size, f.creation_date, f.modification_date,
-    m.uid, m.tstamp, m.crdate, m.file, m.width, m.height
-    FROM sys_file f JOIN sys_file_metadata m ON f.uid=m.file`
+const querySelect = `SELECT f.uid, f.tstamp, f.type, f.identifier, f.identifier_hash,
+	f.folder_hash, f.extension, f.mime_type, f.name, f.sha1, f.size,
+    m.uid, m.width, m.height
+    FROM sys_file f JOIN sys_file_metadata m ON f.uid=m.file;
+`
 
 const queryInsertMeta = `INSERT INTO sys_file_metadata (tstamp, crdate, file, width, height) VALUES
 ("%d","%d","UID","%d","%d");
@@ -367,7 +368,7 @@ func (p *props) writeNormal(w io.Writer) {
 	}
 	metaUid := "UID"
 	if p.metaUid != 0 {
-		uid = fmt.Sprintf("%d", p.metaUid)
+		metaUid = fmt.Sprintf("%d", p.metaUid)
 	}
 	// Write file entry
 	fmt.Fprintf(w, `file:"%s","0","%d","0","0","1","%d","0","`, uid, p.ctime.Unix(), p.ftype)
@@ -380,7 +381,7 @@ func (p *props) writeNormal(w io.Writer) {
 	// Write metadata
 	fmt.Fprintf(w, `meta:"%s","0","%d","%d","0","0","0","",`, metaUid, p.modtime.Unix(), p.ctime.Unix())
 	io.WriteString(w, `"0","0","0","","0","0","0","0","0","0",`)
-	fmt.Fprintf(w, `"UID","","%d","%d",`, p.isize.X, p.isize.Y)
+	fmt.Fprintf(w, `"%s","","%d","%d",`, uid, p.isize.X, p.isize.Y)
 	io.WriteString(w, "\"\",\"\",\"0\"\n")
 }
 
@@ -396,12 +397,36 @@ func dumpDatabase(dsn string, w io.Writer) error {
 	defer rows.Close()
 	p := &props{}
 	for rows.Next() {
-		// TODO: ctime and modtime are written more than once, remove from fields.
-		if err := rows.Scan(&p.uid, &p.ctime, &p.ftype, &p.fname, &p.ident,
-			&p.dident, &p.ext, &p.mime, &p.bname, &p.chash, &p.size, &p.ctime,
-			&p.modtime, &p.metaUid, &p.modtime, &p.ctime, &p.isize.X, &p.isize.Y); err != nil {
+		var (
+			tstamp int64
+			ident  string
+			dident string
+			chash  string
+		)
+		if err := rows.Scan(&p.uid, &tstamp, &p.ftype, &p.fname, &ident,
+			&dident, &p.ext, &p.mime, &p.bname, &chash, &p.size,
+			&p.metaUid, &p.isize.X, &p.isize.Y); err != nil {
 			return fmt.Errorf("reading row failed: %s", err)
 		}
+		// Adapt some fields to internal representation. Quite wasteful, but OK for now.
+		p.ctime = time.Unix(tstamp, 0)
+		p.modtime = p.ctime
+		hash, err := hex.DecodeString(ident)
+		if err != nil {
+			return fmt.Errorf("parsing %s: %s", ident, err)
+		}
+		copy(p.ident[:], hash)
+		hash, err = hex.DecodeString(dident)
+		if err != nil {
+			return fmt.Errorf("parsing %s: %s", dident, err)
+		}
+		copy(p.dident[:], hash)
+		hash, err = hex.DecodeString(chash)
+		if err != nil {
+			return fmt.Errorf("parsing %s: %s", chash, err)
+		}
+		copy(p.chash[:], hash)
+		// Write the CSV normal double entry
 		p.writeNormal(w)
 	}
 	return nil
