@@ -99,7 +99,7 @@ func (d delta) load(r io.Reader) error {
 
 func (d delta) writeTo(w io.Writer) error {
 	for _, e := range d {
-		if _, err := fmt.Fprintf(w, "file:%s\nmeta:%s\n", e.file, e.meta); err != nil {
+		if _, err := fmt.Fprintf(w, "%s\n%s\n", e.file, e.meta); err != nil {
 			return err
 		}
 	}
