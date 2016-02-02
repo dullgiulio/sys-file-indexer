@@ -40,7 +40,7 @@ argument or the current directory by default.
 Generate the normal mode CSV output:
 
 ```
-$ sys-file-indexer >../normal.csv
+$ sys-file-indexer . >../normal.csv
 ```
 
 Update a previously generated normal mode CSV:
