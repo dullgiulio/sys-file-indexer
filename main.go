@@ -18,6 +18,7 @@ import (
 var (
 	singleMode = flag.Bool("single", false, "Output in single view mode")
 	sqlMode    = flag.Bool("sql", false, "Output in SQL mode")
+	useMd5     = flag.Bool("md5", false, "Use MD5 instead of SHA-1 to produce digests")
 	osqlMode   = flag.String("osql", "", "Output SQL parsing common CSV from file `F` or stdin")
 	fileMode   = flag.String("ofile", "", "Output the CSV for sys_file reading reading from `F`")
 	metaMode   = flag.String("ometa", "", "Output the CSV for sys_file_metadata reading from `F`")
@@ -162,7 +163,7 @@ func main() {
 	go idx.scan(root, nproc)
 
 	// Start all processors
-	proc := newProcessor(idx.sink(), writer, nproc, delta)
+	proc := newProcessor(*useMd5, idx.sink(), writer, nproc, delta)
 	proc.run()
 
 	// Wait for all processors to finish processing files.

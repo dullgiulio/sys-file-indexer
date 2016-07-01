@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"crypto/sha1"
 	"database/sql"
 	"encoding/hex"
@@ -92,7 +93,7 @@ type tools struct {
 	buf  bytes.Buffer
 }
 
-func newProcessor(in <-chan file, w *writer, n int, d delta) *processor {
+func newProcessor(useMd5 bool, in <-chan file, w *writer, n int, d delta) *processor {
 	p := &processor{
 		nproc:  n,
 		in:     in,
@@ -101,7 +102,13 @@ func newProcessor(in <-chan file, w *writer, n int, d delta) *processor {
 		tools:  make(chan *tools, n),
 	}
 	for i := 0; i < n; i++ {
-		p.tools <- &tools{sha1.New(), bytes.Buffer{}}
+		t := &tools{buf: bytes.Buffer{}}
+		if useMd5 {
+			t.hash = md5.New()
+		} else {
+			t.hash = sha1.New()
+		}
+		p.tools <- t
 	}
 	return p
 }
