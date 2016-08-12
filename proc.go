@@ -23,7 +23,8 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"path/filepath"
+	"path"
+    "path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -236,14 +237,6 @@ type props struct {
 	ctime time.Time
 }
 
-func stripRoot(s string) string {
-	n := strings.Index(s, "/")
-	if n >= 0 {
-		return s[n:]
-	}
-	return s
-}
-
 func mapType(mime string) int {
 	n := strings.Index(mime, "/")
 	if n >= 0 {
@@ -274,7 +267,7 @@ func fileExt(fname string) string {
 
 // Fast operations to fill props struct
 func newProps(h hash.Hash, f file, name string) *props {
-	fname := stripRoot(name)
+	fname := path.Clean(name)
 	ext := fileExt(fname)
 	dir := filepath.Dir(fname)
 	ident := strhash(fname, h)
